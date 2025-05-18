@@ -166,7 +166,6 @@
         // 예: "https://script.google.com/macros/s/여기에_선생님의_웹앱_ID/exec";
         // 만약 APPS_SCRIPT_WEB_APP_URL이 비어있으면, Google Sheets 저장은 시도되지 않습니다.
 
-        // --- 나머지 DOM 요소 및 변수 선언은 이전과 동일 ---
         const initialSetupSection = document.getElementById('initial-setup-section');
         const studentNameInput = document.getElementById('student-name');
         const studentIdInput = document.getElementById('student-id');
@@ -214,11 +213,95 @@
             { stageName: "🌈 결말: 새로운 내일", prompt: "모든 시련을 이겨낸 주인공의 이야기는 어떻게 아름답게 마무리될까요?", options: [ { text: "평화의 시대를 연 위대한 영웅왕", segment: "아서는 성검 칼리번의 힘으로 왕국을 위협하던 모든 어둠을 물리치고, 백성들의 뜨거운 지지 속에 아발론의 위대한 영웅왕으로 추대되었습니다. 그의 통치 아래 왕국에는 영원한 평화와 번영의 시대가 열렸습니다. " }, { text: "생명의 숲을 지키는 대현자", segment: "엘리나는 정화된 수정 숲과, 마음을 되찾은 세라피나와 함께 숲의 새로운 수호자이자 대현자가 되었습니다. 그녀의 지혜와 마법은 모든 생명과 조화롭게 어우러져 숲을 더욱 신비롭고 풍요로운 낙원으로 가꾸었습니다. " }, { text: "끝없는 우주를 향한 꿈의 탐험가", segment: "리오와 에디슨 할아버지는 자신들이 지켜낸 아름다운 차원을 뒤로하고, 직접 만든 반짝이는 우주선 '꿈나래호'를 타고 아직 아무도 가보지 못한 신비로운 우주와 새로운 차원을 향한 가슴 뛰는 탐험을 다시 시작했습니다. 그들의 모험은 이제 막 시작된 것이죠! " } ] }
         ];
 
-        function showMessage(message, type = 'info') { /* 이전과 동일 */ }
-        function parsePastedStory(pastedText) { /* 이전과 동일 */ }
-        function updateStoryOutput() { /* 이전과 동일 */ }
+        function showMessage(message, type = 'info') { 
+            const messageBox = document.getElementById('message-box');
+            messageBox.textContent = message;
+            const baseClasses = 'fixed bottom-5 left-1/2 p-3 rounded-lg shadow-xl z-[1000] opacity-0 invisible transition-all duration-300 font-gaegu text-lg';
+            
+            let typeClasses = 'bg-slate-700 text-white border-2 border-slate-500';
+            if (type === 'success') {
+                typeClasses = 'bg-green-500 text-white border-2 border-green-700';
+            } else if (type === 'error') {
+                typeClasses = 'bg-red-500 text-white border-2 border-red-700';
+            }
+            messageBox.className = `${baseClasses} ${typeClasses}`;
+            
+            messageBox.classList.add('show');
+            messageBox.classList.remove('opacity-0', 'invisible', 'transform', '-translate-x-1/2');
+            messageBox.classList.add('opacity-100', 'visible');
+            messageBox.style.transform = 'translateX(-50%) translateY(-10px)';
+
+            setTimeout(() => {
+                messageBox.classList.remove('show', 'opacity-100', 'visible');
+                messageBox.classList.add('opacity-0', 'invisible');
+                messageBox.style.transform = 'translateX(-50%)';
+            }, 3000);
+        }
+
+        function parsePastedStory(pastedText) { 
+            console.log("HTML: parsePastedStory called with text length:", pastedText ? pastedText.length : "null/undefined");
+            const segments = [];
+            const lines = pastedText.split('\n');
+            let currentAuthorForParse = "알 수 없는 작성자";
+            let currentTextForParse = "";
+            const authorRegex = /^\[작성자:\s*(.+?)\s*\]$/; 
+            const separatorRegex = /^~+.*?~+$/; 
+            const titleRegex = /^===.*?===$/; 
+
+            for (const line of lines) {
+                const authorMatch = line.match(authorRegex);
+                const separatorMatch = line.match(separatorRegex);
+                const titleMatch = line.match(titleRegex);
+
+                if (titleMatch) { 
+                    continue;
+                } else if (authorMatch) {
+                    if (currentTextForParse.trim() !== "") {
+                        segments.push({ author: currentAuthorForParse, text: currentTextForParse.trim() + " " });
+                    }
+                    currentAuthorForParse = authorMatch[1];
+                    currentTextForParse = "";
+                } else if (separatorMatch) {
+                     if (currentTextForParse.trim() !== "") {
+                        segments.push({ author: currentAuthorForParse, text: currentTextForParse.trim() + " " });
+                    }
+                    segments.push({ author: "알림", text: line.trim() + "\n\n" });
+                    currentAuthorForParse = "알 수 없는 작성자"; 
+                    currentTextForParse = "";
+                } else if (line.trim() !== "") {
+                    currentTextForParse += line + "\n";
+                }
+            }
+            if (currentTextForParse.trim() !== "") {
+                segments.push({ author: currentAuthorForParse, text: currentTextForParse.trim() + " " });
+            }
+            console.log("HTML: parsePastedStory returning segments:", segments);
+            return segments;
+        }
+
+        function updateStoryOutput() { 
+            storyOutput.innerHTML = ""; 
+            if (storySegments.length === 0) {
+                storyOutput.textContent = "이야기가 여기에 스케치됩니다...";
+                return;
+            }
+            storySegments.forEach(seg => {
+                const segmentDiv = document.createElement('div');
+                segmentDiv.className = 'story-segment';
+                
+                const authorSpan = document.createElement('span');
+                authorSpan.className = 'segment-author';
+                authorSpan.textContent = `작성자: ${seg.author}`;
+                segmentDiv.appendChild(authorSpan);
+
+                const cleanedText = seg.text.trim().replace(/\s+/g, ' ');
+                const textNode = document.createTextNode(cleanedText + " "); 
+                segmentDiv.appendChild(textNode);
+                
+                storyOutput.appendChild(segmentDiv);
+            });
+        }
         
-        // Apps Script로 데이터 전송하는 함수 (수정됨)
         async function sendToAppsScript(segmentData) {
             if (!APPS_SCRIPT_WEB_APP_URL) {
                 console.warn("HTML: Apps Script Web App URL이 설정되지 않았습니다. Sheets 저장을 건너뜁니다.");
@@ -229,16 +312,16 @@
                 id: currentAuthorIdOnly,     
                 segment: segmentData.text    
             };
-            console.log("HTML: Sending to Apps Script:", dataToSend); // 데이터 전송 전 로그
+            console.log("HTML: Sending to Apps Script:", dataToSend); 
 
             try {
                 const response = await fetch(APPS_SCRIPT_WEB_APP_URL, {
                     method: "POST",
                     mode: "no-cors", 
                     headers: {
-                        'Content-Type': 'text/plain', // 데이터를 JSON 문자열로 보내고, Content-Type을 text/plain으로 명시
+                        'Content-Type': 'text/plain', 
                     },
-                    body: JSON.stringify(dataToSend) // 데이터를 JSON 문자열로 변환하여 전송
+                    body: JSON.stringify(dataToSend) 
                 });
                 
                 showMessage("이야기 조각이 Google Sheets로 전송 시도되었습니다.", "info");
@@ -249,14 +332,13 @@
                 showMessage("이야기 조각을 Sheets로 전송 중 통신 오류가 발생했습니다.", "error");
             }
         }
-
-        // --- 나머지 JavaScript 함수들은 이전과 거의 동일 ---
-        // (startStoryButton, renderStep, addCustomTextButton, handleChoice, handleEndOfChapter, finalizeStory, continueStoryRelay, resetButton, copyCurrentStoryButton, window.onload)
-        // handleChoice 함수 내에서 sendToAppsScript 호출은 유지됩니다.
+        
         startStoryButton.addEventListener('click', () => {
+            console.log("HTML: startStoryButton clicked."); 
             const name = studentNameInput.value.trim();
             const id = studentIdInput.value.trim();
             const pastedText = pasteStoryArea.value.trim();
+            console.log("HTML: Pasted text length:", pastedText.length); 
 
             if (!name || !id) {
                 showMessage("이름과 학번(별명)을 모두 입력해주세요!", "error");
@@ -267,24 +349,35 @@
             currentAuthor = `${name} (${id})`;
             
             if (pastedText) {
+                console.log("HTML: Processing pasted text..."); 
                 storySegments = parsePastedStory(pastedText);
-                const lastSegment = storySegments.length > 0 ? storySegments[storySegments.length - 1] : null;
+                console.log("HTML: storySegments after parsePastedStory:", storySegments); 
+                console.log("HTML: Type of storySegments:", typeof storySegments); 
+
+                if (!Array.isArray(storySegments)) {
+                    console.error("HTML: FATAL - storySegments is not an array after parsePastedStory! Defaulting to empty array.");
+                    storySegments = [];
+                }
+
+                const lastSegment = storySegments.length > 0 ? storySegments[storySegments.length - 1] : null; 
                 if (lastSegment && lastSegment.author === "알림" && lastSegment.text.includes("다음 작가의 이야기")) {
                     currentStepIndex = 1; 
-                } else if (storySegments.length > 0) {
+                } else if (storySegments.length > 0) { 
                     currentStepIndex = 1; 
                     storySegments.push({ author: "알림", text: "\n~~~~~~~~~~~~~ 다음 작가의 이야기 ~~~~~~~~~~~~~\n" });
                 } else { 
-                    storySegments = [];
+                    storySegments = []; 
                     currentStepIndex = 0;
                 }
                 showMessage("이전 이야기를 성공적으로 불러왔습니다! 이야기를 이어가세요.", "success");
             } else { 
+                console.log("HTML: No pasted text. Starting new story."); 
                 storySegments = [];
                 currentStepIndex = 0;
                 showMessage(`${currentAuthor}님, 환영합니다! 새로운 이야기를 시작하세요.`, "success");
             }
             
+            console.log("HTML: Hiding initial setup, showing main interface. currentStepIndex:", currentStepIndex); 
             initialSetupSection.classList.add('hidden');
             mainStoryInterface.classList.remove('hidden');
             completedStoryContainer.classList.add('hidden'); 
@@ -486,4 +579,3 @@
     </script>
 </body>
 </html>
-```
